@@ -23,6 +23,13 @@ The targets are:
  - __play__: create a game between the user and the agent.
  - __help__: target print the documentation.
 
+## Tensorboard
+
+To see the results of the training in TensorBoard type:
+```
+tensorboard --logdir=~/ray_results
+```
+
 ## About
 
 Author : Martin Labé \
