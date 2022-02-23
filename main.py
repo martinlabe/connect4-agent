@@ -1,13 +1,16 @@
 import sys
 import os
+import shutil
 import ray.rllib.agents.dqn as dqn
 from gym_connect4.envs.connect4_env import Connect4Env
 from src.model import Connect4Model
+from time import sleep
 
 ## UTILS #####################################################################
 models_path = "./models/"
 
-def get_config():
+
+def get_config(env):
     """generate the rllib config"""
     ## DQN
     config = dqn.DEFAULT_CONFIG.copy()
@@ -23,14 +26,6 @@ def get_config():
     config["dueling"] = True
     # config["exploration"] = {}
     ## Env
-    ENV_CONFIG = {
-        "width": 7,
-        "height": 6,
-        "connect": 4,
-        "verbose": False
-    }
-    env = Connect4Env(ENV_CONFIG)
-    obs = env.reset()
     config["env_config"] = ENV_CONFIG
     ## Multi-agent
     ## https://docs.ray.io/en/latest/rllib-env.html#multi-agent-and-hierarchical
@@ -51,17 +46,20 @@ def get_config():
         "custom_model_config": {}
     }
     ## Resources
-    config["num_workers"] = 6
+    # config["train_batch_size"] = 500
+    config["num_workers"] = 1
     config["render_env"] = False
     config["record_env"] = False
     config["num_gpus"] = 1
     return config
+
 
 def load_weights(trainer):
     """load available weights"""
     # if the models directory is empty
     if len(os.listdir(models_path)) == 0:
         print("No checkpoint. Starting from scratch.")
+        return
     # load last checkpoint dir
     last_checkpoint_dir = max(os.listdir(models_path))
     last_checkpoint_num = int(last_checkpoint_dir[-6:])
@@ -70,9 +68,10 @@ def load_weights(trainer):
     trainer.restore(models_path + last_checkpoint_dir + '/' + last_checkpoint)
     print(f"Checkpoint {last_checkpoint_num} loaded.")
 
-def get_trainer():
+
+def get_trainer(env):
     """create the trainer with the config and load the weights"""
-    config = get_config()
+    config = get_config(env)
     trainer = dqn.DQNTrainer(config, env=Connect4Env)
     load_weights(trainer)
     return trainer
@@ -88,9 +87,9 @@ def help():
 
 
 ## TRAIN #######################################################################
-def train():
+def train(env):
     """train the network - eventually load the previous weights"""
-    trainer = get_trainer()
+    trainer = get_trainer(env)
     num_iterations = 10000
     num_step = 50
     num_start = trainer.iteration
@@ -103,20 +102,96 @@ def train():
 
 
 ## PLAY ########################################################################
-def play():
+def print_winner(winner):
+    res = "\n"
+    if winner:
+        res += "██    ██  ██████  ██    ██     ██     ██ ██ ███    ██ ██\n"
+        res += " ██  ██  ██    ██ ██    ██     ██     ██ ██ ████   ██ ██\n"
+        res += "  ████   ██    ██ ██    ██     ██  █  ██ ██ ██ ██  ██ ██\n"
+        res += "   ██    ██    ██ ██    ██     ██ ███ ██ ██ ██  ██ ██   \n"
+        res += "   ██     ██████   ██████       ███ ███  ██ ██   ████ ██\n"
+    else:
+        res += "██    ██  ██████  ██    ██     ██       ██████  ███████ ███████ ██\n"
+        res += " ██  ██  ██    ██ ██    ██     ██      ██    ██ ██      ██      ██\n"
+        res += "  ████   ██    ██ ██    ██     ██      ██    ██ ███████ █████   ██\n"
+        res += "   ██    ██    ██ ██    ██     ██      ██    ██      ██ ██        \n"
+        res += "   ██     ██████   ██████      ███████  ██████  ███████ ███████ ██\n"
+    print(res)
+
+
+def print_res(env):
+    """print the results of the game"""
+    if env.player == 1:
+        if env.state == "WIN":
+            print_winner(True)
+        elif env.state == "WRONG":
+            print("Vous avez fait un coup invalide.")
+    else:
+        if env.state == "WIN":
+            print_winner(False)
+        elif env.state == "WRONG":
+            print("Votre adversaire a fait un coup invalide.")
+    if env.state == "DRAW":
+        print("Partie nulle.")
+
+
+def play(env):
     """create the interface between the player and the agent"""
-    pass
+    env.verbose = False
+    env.visualization = False
+    trainer = get_trainer(env)
+    trainer.config["exploration"] = False
+    env.reset()
+    done = {"__all__": False}
+    sleep(1)
+    while not done["__all__"]:
+        env.render(mode="human")
+        a = int(input("Which column do you play? (1-7)\n")) - 1
+        obs, reward, done, info = env.step({1: a})
+        if done["__all__"]:
+            break
+        b = trainer.compute_single_action(obs[2], explore=False, policy_id="player")
+        obs, reward_b, done, info = env.step({2: b})
+        if done["__all__"]:
+            break
+    print_res(env)
+    return
+
+
+## CLEAN #######################################################################
+def clean():
+    """clean the project files"""
+    folder = './models/'
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print('Failed to delete %s. Reason: %s' % (file_path, e))
 
 
 ## MAIN ########################################################################
 if __name__ == "__main__":
+    ENV_CONFIG = {
+        "width": 7,
+        "height": 6,
+        "connect": 4,
+        "verbose": True,
+        "visualization": True
+    }
+    myenv = Connect4Env(ENV_CONFIG)
     if len(sys.argv) == 2:
         if sys.argv[1] == "train":
-            train()
+            train(myenv)
         elif sys.argv[1] == "play":
-            play()
+            play(myenv)
         elif sys.argv[1] == "help":
             help()
+        elif sys.argv[1] == "clean":
+            clean()
         else:
             print("Error: command unknown.\nPlease type 'python main.py help'")
     else:
