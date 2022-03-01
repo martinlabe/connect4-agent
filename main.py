@@ -8,6 +8,7 @@ from time import sleep
 
 ## UTILS #####################################################################
 models_path = "./models/"
+check = False
 
 
 def get_config(env):
@@ -16,10 +17,9 @@ def get_config(env):
     config = dqn.DEFAULT_CONFIG.copy()
     config["num_atoms"] = 2
     ## Rainbow
-    # rainbow_config = dqn_config.copy()
-    # rainbow_config["n_step"] = 5
-    # rainbow_config["noisy"] = True
-    # rainbow_config["num_atoms"] = 10
+    config["n_step"] = 5
+    config["noisy"] = True
+    config["num_atoms"] = 10
     config["v_min"] = -1
     config["v_max"] = 100
     config["double_q"] = True
@@ -47,7 +47,7 @@ def get_config(env):
     }
     ## Resources
     # config["train_batch_size"] = 500
-    config["num_workers"] = 1
+    config["num_workers"] = 1 if check else 8
     config["render_env"] = False
     config["record_env"] = False
     config["num_gpus"] = 1
@@ -56,6 +56,9 @@ def get_config(env):
 
 def load_weights(trainer):
     """load available weights"""
+    # checking that the models directory exists
+    if not os.path.exists(models_path):
+        os.mkdir(models_path)
     # if the models directory is empty
     if len(os.listdir(models_path)) == 0:
         print("No checkpoint. Starting from scratch.")
@@ -137,8 +140,6 @@ def print_res(env):
 
 def play(env):
     """create the interface between the player and the agent"""
-    env.verbose = False
-    env.visualization = False
     trainer = get_trainer(env)
     trainer.config["exploration"] = False
     env.reset()
@@ -173,26 +174,45 @@ def clean():
             print('Failed to delete %s. Reason: %s' % (file_path, e))
 
 
+## CLEAN #######################################################################
+def model(env):
+    """print the model summary"""
+    Connect4Model(myenv.observation_space,
+                  myenv.action_space,
+                  256,
+                  get_config(myenv),
+                  "Connect4CNN").base_model.summary()
+
+
 ## MAIN ########################################################################
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Error: wrong usage.\nPlease type 'python main.py help'")
+        exit(2)
+
+    if "--check" in sys.argv:
+        check = True
+    if "--quick" in sys.argv:
+        check = False
+
     ENV_CONFIG = {
         "width": 7,
         "height": 6,
         "connect": 4,
-        "verbose": True,
-        "visualization": True
+        "verbose": check,
+        "visualization": check
     }
     myenv = Connect4Env(ENV_CONFIG)
-    if len(sys.argv) == 2:
-        if sys.argv[1] == "train":
-            train(myenv)
-        elif sys.argv[1] == "play":
-            play(myenv)
-        elif sys.argv[1] == "help":
-            help()
-        elif sys.argv[1] == "clean":
-            clean()
-        else:
-            print("Error: command unknown.\nPlease type 'python main.py help'")
+
+    if sys.argv[1] == "train":
+        train(myenv)
+    elif sys.argv[1] == "play":
+        play(myenv)
+    elif sys.argv[1] == "help":
+        help()
+    elif sys.argv[1] == "clean":
+        clean()
+    elif sys.argv[1] == "model":
+        model(myenv)
     else:
-        print("Error: wrong usage.\nPlease type 'python main.py help'")
+        print("Error: command unknown.\nPlease type 'python main.py help'")
