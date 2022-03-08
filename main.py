@@ -5,6 +5,7 @@ import ray.rllib.agents.dqn as dqn
 from gym_connect4.envs.connect4_env import Connect4Env
 from src.model import Connect4Model
 from time import sleep
+from time import gmtime, strftime   
 
 ## UTILS #####################################################################
 models_path = "./models/"
@@ -20,11 +21,18 @@ def get_config(env):
     config["n_step"] = 5
     config["noisy"] = True
     config["num_atoms"] = 10
-    config["v_min"] = -1
+    config["v_min"] = -100
     config["v_max"] = 100
     config["double_q"] = True
     config["dueling"] = True
-    # config["exploration"] = {}
+    # others
+    config["horizon"] = ENV_CONFIG["width"] * ENV_CONFIG["height"] + 10 * 2 + 1
+    config["exploration_config"] = {
+        "type": "EpsilonGreedy",
+        "epsilon_timesteps": 1e6,
+        "initial_epsilon": 1,
+        "final_epsilon": 0.001
+    }
     ## Env
     config["env_config"] = ENV_CONFIG
     ## Multi-agent
@@ -47,10 +55,11 @@ def get_config(env):
     }
     ## Resources
     # config["train_batch_size"] = 500
-    config["num_workers"] = 1 if check else 8
+    config["num_workers"] = 1 if check else 6
     config["render_env"] = False
     config["record_env"] = False
     config["num_gpus"] = 1
+    config["num_gpus_per_worker"] = 0 if check else 0.6 / 6 - 0.001
     return config
 
 
@@ -100,7 +109,7 @@ def train(env):
         trainer.train()
         if i % num_step == 0:
             trainer.save(models_path)
-            print(f"Checkpoint {i} exported")
+            print(strftime("%H:%M:%S", gmtime()), f"Checkpoint {i} exported")
     trainer.stop()
 
 
@@ -194,6 +203,7 @@ if __name__ == "__main__":
         check = True
     if "--quick" in sys.argv:
         check = False
+    one_worker = check
 
     ENV_CONFIG = {
         "width": 7,
@@ -207,6 +217,7 @@ if __name__ == "__main__":
     if sys.argv[1] == "train":
         train(myenv)
     elif sys.argv[1] == "play":
+        check = True
         play(myenv)
     elif sys.argv[1] == "help":
         help()
