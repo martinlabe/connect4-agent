@@ -20,11 +20,10 @@ class Connect4Model(DistributionalQTFModel):
             #tf.keras.layers.Conv2D(32, 3, padding="same", activation="relu"),
             #tf.keras.layers.Conv2D(26, 3, padding="same", activation="relu"),
             tf.keras.layers.Flatten(),
-            tf.keras.layers.Dense(6 * 7, activation='relu'),
-            tf.keras.layers.Dense(100, activation='relu'),
-            tf.keras.layers.Dense(42, activation='relu'),
-            tf.keras.layers.Dense(42, activation='relu'),
-            tf.keras.layers.Dense(num_outputs, activation='relu')
+            tf.keras.layers.Dense(6 * 7, activation='tanh'),
+            tf.keras.layers.Dense(6 * 7, activation='tanh'),
+            tf.keras.layers.Dense(6 * 7, activation='tanh'),
+            tf.keras.layers.Dense(num_outputs, activation='tanh')
         ])
 
     def forward(self, input_dict, state, seq_lens):
